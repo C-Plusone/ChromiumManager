@@ -1,0 +1,17 @@
+#!/bin/bash
+BIN=/opt/chromium/chrome
+
+# Cleanup
+if ! pgrep -f ${BIN} > /dev/null;then
+  rm -f $HOME/.config/chromium/Singleton*
+fi
+
+# Run normally on privved containers or modified un non priv
+if grep -q 'Seccomp:.0' /proc/1/status; then
+  exec ${BIN} \
+  "$@" > /dev/null 2>&1
+else
+  exec ${BIN} \
+  --no-sandbox \
+  "$@" > /dev/null 2>&1
+fi
