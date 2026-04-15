@@ -56,9 +56,15 @@
                 启动
               </el-button>
               <el-button size="small" @click.stop="onEditClick(scope.row)">编辑</el-button>
-              <el-button size="small" class="delete" @click.stop="onDeleteClick(scope.row)">
-                删除
-              </el-button>
+              <el-dropdown trigger="click" @command="(cmd) => onMoreCommand(cmd, scope.row)">
+                <el-button size="small" @click.stop>更多</el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="saveAsTemplate">存为模板</el-dropdown-item>
+                    <el-dropdown-item command="delete" divided class="delete-item">删除</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
             </template>
           </template>
         </el-table-column>
@@ -331,6 +337,18 @@
 
     <ProxyManagement v-model="proxyManageVisible" @change="fetchProxies" @select="onProxySelect" />
 
+    <el-dialog v-model="saveTemplateDialog" title="存为模板" :width="400">
+      <el-form ref="saveTemplateFormRef" :model="saveTemplateForm" :rules="saveTemplateRules" label-width="auto">
+        <el-form-item label="模板名称" prop="templateName">
+          <el-input v-model="saveTemplateForm.templateName" placeholder="请输入模板名称"></el-input>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="saveTemplateDialog = false">取消</el-button>
+        <el-button type="primary" @click="onSaveTemplateConfirm">确定</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="cookieDialog" title="导入Cookie" :width="600">
       <el-form ref="cookieFormRef" :model="cookieForm" :rules="cookieRules">
         <el-form-item prop="text">
@@ -378,7 +396,8 @@ import {
   stopProfile,
   showProfile,
   exportCookies,
-  importCookies
+  importCookies,
+  saveAsTemplate
 } from '@/api'
 import { validateForm } from '@/utils/common'
 import { languages, timezones, screens, BASE_URL } from '@/utils/constants'
@@ -395,6 +414,13 @@ const formRef = ref(null)
 const formDialog = ref(false)
 const runningSet = ref(new Set())
 const proxyManageVisible = ref(false)
+const saveTemplateDialog = ref(false)
+const saveTemplateFormRef = ref(null)
+const saveTemplateForm = reactive({ profileId: '', templateName: '' })
+const saveTemplateRules = {
+  templateName: [{ required: true, message: '请输入模板名称', trigger: 'blur' }]
+}
+
 const cookieDialog = ref(false)
 const cookieImportRow = ref(null)
 const cookieFormRef = ref(null)
@@ -662,6 +688,34 @@ const onStopClick = async (row) => {
   }
 }
 
+const onMoreCommand = (cmd, row) => {
+  if (cmd === 'saveAsTemplate') onSaveAsTemplate(row)
+  else if (cmd === 'delete') onDeleteClick(row)
+}
+
+const onSaveAsTemplate = (row) => {
+  saveTemplateForm.profileId = row._id
+  saveTemplateForm.templateName = ''
+  saveTemplateDialog.value = true
+  nextTick(() => saveTemplateFormRef.value?.clearValidate())
+}
+
+const onSaveTemplateConfirm = async () => {
+  if (!saveTemplateFormRef.value) return
+  const valid = await validateForm(saveTemplateFormRef.value)
+  if (!valid) return
+  try {
+    await saveAsTemplate({
+      profileId: saveTemplateForm.profileId,
+      templateName: saveTemplateForm.templateName
+    })
+    ElMessage.success('已保存为模板！')
+    saveTemplateDialog.value = false
+  } catch (err) {
+    if (!err?.silent) ElMessage.error('保存失败：' + (err?.message || err))
+  }
+}
+
 const onCookieImport = (row) => {
   cookieImportRow.value = row
   cookieForm.text = ''
@@ -750,6 +804,10 @@ defineExpose({
   .left .cell {
     padding-left: 24px;
   }
+}
+
+.delete-item {
+  color: #f56c6c !important;
 }
 </style>
 
